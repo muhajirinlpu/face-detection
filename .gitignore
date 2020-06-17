@@ -1,6 +1,8 @@
 .idea/
 __pycache__/
 assets/dataset/
+assets/known_datasets/
+!assets/known_datasets/.gitkeep
 venv
 video/*
 !video/.gitkeep

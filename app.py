@@ -1,5 +1,4 @@
 import cv2
-import numpy as np
 from typing import Union
 
 from detector import Detector
@@ -18,7 +17,7 @@ class App:
         while self.capture.isOpened():
             ret, frame = self.capture.read()
             if ret:
-                self.detector.process(frame)
+                self.detector.process_detected_faces_prop(frame)
                 if self.detector.detected_faces is not None:
                     for i in range(0, len(self.detector.detected_faces)):
                         (startX, startY, endX, endY, confidence) = self.detector.detected_faces[i]
@@ -40,5 +39,5 @@ class App:
 
 
 if __name__ == "__main__":
-    video = App(min_confidence=0.5)
+    video = App()
     video.start()
