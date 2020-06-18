@@ -4,8 +4,6 @@ import threading
 import cv2
 import os
 from enum import Enum
-from matplotlib import pyplot as plt
-import tempfile
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, model_from_json
 from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPooling2D
@@ -143,6 +141,7 @@ class Identifier:
         model.add(MaxPooling2D(2, 2))
         model.add(Flatten())
         model.add(Dense(512, activation='relu'))
+        # model.add(Dropout(0.5))
         model.add(Dense(length, activation='softmax'))
 
         model.compile(loss='categorical_crossentropy',
@@ -158,7 +157,7 @@ class Identifier:
                 continue
 
             faces_list.append(os.path.basename(dir_path))
-            detector = Detector()
+            detector = Detector(0.9)
             basename = os.path.basename(dir_path)
             save_in_dir = tempdir + '/' + basename
 
@@ -174,13 +173,12 @@ class Identifier:
                 for face in detector.get_faces_image(frame):
                     cv2.imwrite(save_in_dir + '/' + str(uuid.uuid4()) + '.jpeg', face)
 
-        return faces_list
+        return np.sort(faces_list).tolist()
 
     def train(self):
         print('=> Start training...')
         tempdir = './temp'
         dataset = self.prepare_dataset(tempdir)
-
         datagen = ImageDataGenerator(rescale=1. / 255,
                                      shear_range=0.2,
                                      validation_split=0.2,

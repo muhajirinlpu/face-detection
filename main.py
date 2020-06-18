@@ -11,7 +11,7 @@ def main(argv):
             Identifier(Identifier.Treatment.TRAIN)
         elif action == 'test':
             i = Identifier()
-            i.predict(cv2.imread('./assets/known_dataset/2103181004/2103181004 (2).jpeg'))
+            i.predict(cv2.imread('./temp/2103181021/8744a10a-19dc-4350-91ca-d88323300d5b.jpeg'))
 
 
 if __name__ == "__main__":
