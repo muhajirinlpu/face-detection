@@ -14,14 +14,14 @@ import uuid
 import json
 
 
-def list_files(startpath):
-    for root, dirs, files in os.walk(startpath):
-        level = root.replace(startpath, '').count(os.sep)
-        indent = ' ' * 4 * (level)
+def list_files(start_path):
+    for root, dirs, files in os.walk(start_path):
+        level = root.replace(start_path, '').count(os.sep)
+        indent = ' ' * 4 * level
         print('{}{}/'.format(indent, os.path.basename(root)))
-        subindent = ' ' * 4 * (level + 1)
+        sub_indent = ' ' * 4 * (level + 1)
         for f in files:
-            print('{}{}'.format(subindent, f))
+            print('{}{}'.format(sub_indent, f))
 
 
 class Detector:
@@ -119,7 +119,7 @@ class Identifier:
                  dataset_dir='./assets/known_dataset',
                  dataset_location='./assets/known_data/dataset.json'):
         self.model = None
-        self.faces_map = None
+        self.faces_list = None
         self.dataset_dir = dataset_dir
         self.dataset_location = dataset_location
         if not os.path.exists(dataset_location):
@@ -152,12 +152,12 @@ class Identifier:
         return model
 
     def prepare_dataset(self, tempdir):
-        faces_map = []
+        faces_list = []
         for dir_path, dir_names, files in os.walk(self.dataset_dir):
             if len(files) == 0:
                 continue
 
-            faces_map.append(os.path.basename(dir_path))
+            faces_list.append(os.path.basename(dir_path))
             detector = Detector()
             basename = os.path.basename(dir_path)
             save_in_dir = tempdir + '/' + basename
@@ -174,7 +174,7 @@ class Identifier:
                 for face in detector.get_faces_image(frame):
                     cv2.imwrite(save_in_dir + '/' + str(uuid.uuid4()) + '.jpeg', face)
 
-        return faces_map
+        return faces_list
 
     def train(self):
         print('=> Start training...')
@@ -198,7 +198,7 @@ class Identifier:
                                                            class_mode='categorical',
                                                            subset="validation")
         list_files(tempdir)
-        model = Identifier.create_model(len(dataset))
+        model = Identifier.create_model(24)
         model.fit(train_generator,
                   steps_per_epoch=30,
                   epochs=20,
@@ -214,7 +214,7 @@ class Identifier:
 
         with open(os.path.dirname(self.dataset_location) + '/' + 'ref_name.json', 'w') as json_file:
             json_file.write(json.dumps(dataset))
-            self.faces_map = dataset
+            self.faces_list = dataset
 
         model.summary()
 
@@ -223,7 +223,7 @@ class Identifier:
             json_saved_model = json_file.read()
 
         with open(os.path.dirname(self.dataset_location) + '/' + 'ref_name.json', 'r') as json_file:
-            self.faces_map = json.loads(json_file.read())
+            self.faces_list = json.loads(json_file.read())
 
         model = model_from_json(json_saved_model)
         model.load_weights(self.dataset_location + '.h5')
@@ -235,11 +235,11 @@ class Identifier:
         self.model = model
 
     def predict(self, img):
-        img = cv2.resize(img, (150, 150))
+        img = cv2.cvtColor(cv2.resize(img, (150, 150)), cv2.COLOR_RGB2BGR)
         x = np.expand_dims(img, axis=0)
-        plt.imshow(img)
-        plt.show()
         image = np.vstack([x])
         classes = self.model.predict(image, batch_size=4)
         i = np.argmax(classes)
-        print(i, self.faces_map[i])
+        print(classes, i, self.faces_list[i])
+
+        return self.faces_list[i]

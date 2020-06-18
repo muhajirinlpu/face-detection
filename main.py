@@ -11,8 +11,7 @@ def main(argv):
             Identifier(Identifier.Treatment.TRAIN)
         elif action == 'test':
             i = Identifier()
-            i.predict(cv2.cvtColor(cv2.imread('./assets/known_dataset/2103181006/2103181006 (2).jpeg'),
-                                   cv2.COLOR_RGB2BGR))
+            i.predict(cv2.imread('./assets/known_dataset/2103181004/2103181004 (2).jpeg'))
 
 
 if __name__ == "__main__":

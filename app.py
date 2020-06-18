@@ -9,7 +9,7 @@ class App:
         self.video_path = path
         self.min_confidence = min_confidence
         self.capture = cv2.VideoCapture(self.video_path)
-        self.detector = Detector(detect_identity=True)
+        self.detector = Detector(detect_identity=True, save_dataset=True)
         if not self.capture.isOpened():
             raise Exception('Error opening video file')
 
@@ -17,6 +17,7 @@ class App:
         while self.capture.isOpened():
             ret, frame = self.capture.read()
             if ret:
+                frame = cv2.flip(frame, 1)
                 self.detector.process_detected_faces_prop(frame)
                 if self.detector.detected_faces is not None:
                     for i in range(0, len(self.detector.detected_faces)):
