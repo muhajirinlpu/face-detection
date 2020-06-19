@@ -3,11 +3,11 @@ venv
 .idea/
 video/*
 __pycache__/
-assets/dataset/
+assets/capture/
 assets/known_data/
 assets/known_dataset/
 
 !video/.gitkeep
-!assets/dataset/.gitkeep
+!assets/capture/.gitkeep
 !assets/known_data/.gitkeep
 !assets/known_dataset/.gitkeep

@@ -9,7 +9,7 @@ class App:
         self.video_path = path
         self.min_confidence = min_confidence
         self.capture = cv2.VideoCapture(self.video_path)
-        self.detector = Detector(detect_identity=True, save_dataset=True)
+        self.detector = Detector(detect_identity=True, save_dataset=False)
         if not self.capture.isOpened():
             raise Exception('Error opening video file')
 
@@ -37,6 +37,10 @@ class App:
     def end(self):
         self.capture.release()
         cv2.destroyAllWindows()
+
+    def detect_captured(self):
+
+        pass
 
 
 if __name__ == "__main__":

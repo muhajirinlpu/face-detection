@@ -1,9 +1,12 @@
+import tempfile
+
 import numpy as np
 import throttle
 import threading
 import cv2
 import os
 from enum import Enum
+from termcolor import colored
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, model_from_json
 from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPooling2D
@@ -61,11 +64,21 @@ class Detector:
 
         return selected_faces
 
-    def get_faces_image(self, frame):
-        return filter(lambda _: _ is not None,
-                      list(map(lambda _: Detector.extract_image(frame, _), self.get_faces(frame))))
+    @staticmethod
+    def extract_image(frame, face):
+        (startX, startY, endX, endY, _) = face
+        image = frame[startY:endY, startX:endX]
+        shape = np.shape(image)
+        if shape[0] == 0 or shape[1] == 0:
+            return None
+        return image
 
-    @throttle.wrap(1, 1)
+    @staticmethod
+    def get_faces_image(frame, faces=None):
+        return list(filter(lambda _: _ is not None,
+                           list(map(lambda _: Detector.extract_image(frame, _), faces))))
+
+    @throttle.wrap(1, 5)
     def process_detected_faces_prop(self, frame):
         print('=> detecting...')
 
@@ -73,7 +86,7 @@ class Detector:
         if len(faces) > 0:
             self.detected_faces = faces
 
-            # find identity from dataset
+            # find identity from capture
             if self.detect_identity:
                 (threading.Thread(target=self.find_identities, args=[frame])).start()
 
@@ -87,23 +100,17 @@ class Detector:
                 self.identifier.predict(Detector.extract_image(frame, face))
 
     @staticmethod
-    def extract_image(frame, face):
-        (startX, startY, endX, endY, _) = face
-        image = frame[startY:endY, startX:endX]
-        shape = np.shape(image)
-        if shape[0] == 0 or shape[1] == 0:
-            return None
-        return image
+    @throttle.wrap(5, 1)
+    def save_dataset_throttled(frame, faces):
+        Detector.save_dataset(frame, faces)
 
     @staticmethod
-    @throttle.wrap(15, 1)
-    def save_dataset(frame, faces, save_in_dir='assets/dataset'):
-        print('=> extracting faces...')
+    def save_dataset(frame, faces, save_in_dir='assets/capture'):
+        print(colored(f'=> extracting {len(faces)} faces...', 'green', attrs=['bold']))
         if not os.path.exists(save_in_dir):
             os.mkdir(save_in_dir)
-
-        for i in range(0, len(faces)):
-            image = Detector.extract_image(frame, faces[i])
+        transform = Detector.get_faces_image(frame, faces)
+        for image in transform:
             cv2.imwrite(save_in_dir + '/' + str(uuid.uuid4()) + '.jpeg', image)
 
 
@@ -115,7 +122,7 @@ class Identifier:
     def __init__(self,
                  treatment=Treatment.LOAD,
                  dataset_dir='./assets/known_dataset',
-                 dataset_location='./assets/known_data/dataset.json'):
+                 dataset_location='./assets/known_data/capture.json'):
         self.model = None
         self.faces_list = None
         self.dataset_dir = dataset_dir
@@ -124,7 +131,8 @@ class Identifier:
             treatment = Identifier.Treatment.TRAIN
 
         if treatment == Identifier.Treatment.TRAIN:
-            self.train()
+            with tempfile.TemporaryDirectory() as tempdir:
+                self.train(tempdir)
         else:
             self.load()
 
@@ -141,7 +149,6 @@ class Identifier:
         model.add(MaxPooling2D(2, 2))
         model.add(Flatten())
         model.add(Dense(512, activation='relu'))
-        # model.add(Dropout(0.5))
         model.add(Dense(length, activation='softmax'))
 
         model.compile(loss='categorical_crossentropy',
@@ -157,28 +164,24 @@ class Identifier:
                 continue
 
             faces_list.append(os.path.basename(dir_path))
-            detector = Detector(0.9)
+            detector = Detector(0.99)
             basename = os.path.basename(dir_path)
             save_in_dir = tempdir + '/' + basename
 
-            if not os.path.exists(save_in_dir):
-                os.mkdir(save_in_dir)
-
-            print('==> enter folder : ' + basename)
+            print('====> enter folder : ' + basename)
             for file_name in files:
-                print('===> load file ' + file_name)
+                print('==> load file ' + file_name)
                 frame = cv2.imread(dir_path + '/' + file_name)
-                if frame is None:
-                    continue
-                for face in detector.get_faces_image(frame):
-                    cv2.imwrite(save_in_dir + '/' + str(uuid.uuid4()) + '.jpeg', face)
+                if frame is not None:
+                    faces = detector.get_faces(frame)
+                    Detector.save_dataset(frame, faces, save_in_dir)
 
         return np.sort(faces_list).tolist()
 
-    def train(self):
+    def train(self, tempdir='./temp'):
         print('=> Start training...')
-        tempdir = './temp'
         dataset = self.prepare_dataset(tempdir)
+        list_files(tempdir)
         datagen = ImageDataGenerator(rescale=1. / 255,
                                      shear_range=0.2,
                                      validation_split=0.2,
@@ -195,7 +198,6 @@ class Identifier:
                                                            batch_size=4,
                                                            class_mode='categorical',
                                                            subset="validation")
-        list_files(tempdir)
         model = Identifier.create_model(24)
         model.fit(train_generator,
                   steps_per_epoch=30,
