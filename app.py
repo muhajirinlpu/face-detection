@@ -1,6 +1,8 @@
+import os
+from threading import Timer
 import cv2
 from typing import Union
-
+from termcolor import colored
 from detector import Detector
 
 
@@ -9,11 +11,11 @@ class App:
         self.video_path = path
         self.min_confidence = min_confidence
         self.capture = cv2.VideoCapture(self.video_path)
-        self.detector = Detector(detect_identity=True, save_dataset=False)
+        self.detector = Detector(detect_identity=True, capture=True)
         if not self.capture.isOpened():
             raise Exception('Error opening video file')
 
-    def start(self):
+    def start(self, timer=-1):
         while self.capture.isOpened():
             ret, frame = self.capture.read()
             if ret:
@@ -26,7 +28,8 @@ class App:
                         y = startY - 10 if startY - 10 > 10 else startY + 10
                         cv2.rectangle(frame, (startX - 2, startY - 2), (endX + 2, endY + 2), (0, 0, 255), 2)
                         cv2.putText(frame, text, (startX, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)
-
+                if timer > 0:
+                    (Timer(timer, self.end)).start()
                 cv2.imshow('Frame', frame)
                 if cv2.waitKey(25) & 0xFF == ord('q'):
                     self.end()
@@ -38,9 +41,12 @@ class App:
         self.capture.release()
         cv2.destroyAllWindows()
 
-    def detect_captured(self):
-
-        pass
+    def detect_captured(self, capture_dir='assets/capture'):
+        print(colored('Detecting picture from assets/capture...', 'green', attrs=['bold']))
+        for filename in os.listdir(capture_dir):
+            if filename.endswith('.jpeg'):
+                image = cv2.imread(capture_dir + '/' + filename)
+                print(self.detector.identifier.predict(image))
 
 
 if __name__ == "__main__":

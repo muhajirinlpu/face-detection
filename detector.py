@@ -31,9 +31,9 @@ class Detector:
                  proto='assets/deploy.prototxt.txt',
                  model='assets/res10_300x300_ssd_iter_140000.caffemodel',
                  detect_identity=False,
-                 save_dataset=False):
+                 capture=False):
         self.min_confidence = min_confidence
-        self.save_dataset = save_dataset
+        self.capture = capture
         self.detect_identity = detect_identity
         # will be typeof None|list<(startX, startY, endX, endY, confidence)>
         self.detected_faces = None
@@ -91,8 +91,8 @@ class Detector:
                 (threading.Thread(target=self.find_identities, args=[frame])).start()
 
             # extract face with start new thread
-            if self.save_dataset:
-                (threading.Thread(target=Detector.save_dataset, args=(frame, faces))).start()
+            if self.capture:
+                (threading.Thread(target=Detector.save_dataset_throttled, args=(frame, faces))).start()
 
     def find_identities(self, frame):
         if self.detected_faces is not None:
@@ -235,11 +235,7 @@ class Identifier:
         self.model = model
 
     def predict(self, img):
-        img = cv2.cvtColor(cv2.resize(img, (150, 150)), cv2.COLOR_RGB2BGR)
-        x = np.expand_dims(img, axis=0)
-        image = np.vstack([x])
+        image = np.expand_dims(cv2.cvtColor(cv2.resize(img, (150, 150)), cv2.COLOR_RGB2BGR), axis=0)
         classes = self.model.predict(image, batch_size=4)
-        i = np.argmax(classes)
-        print(classes, i, self.faces_list[i])
 
-        return self.faces_list[i]
+        return self.faces_list[np.argmax(classes)]
