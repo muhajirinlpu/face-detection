@@ -24,7 +24,10 @@ class App:
                 if self.detector.detected_faces is not None:
                     for i in range(0, len(self.detector.detected_faces)):
                         (startX, startY, endX, endY, confidence) = self.detector.detected_faces[i]
-                        text = "{:.2f}%".format(confidence * 100)
+                        text = "identifying face | confidence : {:.2f}%".format(confidence * 100)
+                        if len(self.detector.detected_faces_identity) - 1 >= i and \
+                                self.detector.detected_faces_identity[i] is not None:
+                            text = self.detector.detected_faces_identity[i]
                         y = startY - 10 if startY - 10 > 10 else startY + 10
                         cv2.rectangle(frame, (startX - 2, startY - 2), (endX + 2, endY + 2), (0, 0, 255), 2)
                         cv2.putText(frame, text, (startX, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 255), 2)

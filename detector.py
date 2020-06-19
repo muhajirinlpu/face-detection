@@ -6,6 +6,9 @@ import threading
 import cv2
 import os
 from enum import Enum
+
+from tensorflow.python.keras.constraints import maxnorm
+from tensorflow.python.keras.layers import AveragePooling2D, Dropout
 from termcolor import colored
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, model_from_json
@@ -28,8 +31,8 @@ def list_files(start_path):
 class Detector:
     def __init__(self,
                  min_confidence=0.5,
-                 proto='assets/deploy.prototxt.txt',
-                 model='assets/res10_300x300_ssd_iter_140000.caffemodel',
+                 proto='./assets/opencv_face_detector_uint8.pb',
+                 model='./assets/opencv_face_detector.pbtxt',
                  detect_identity=False,
                  capture=False):
         self.min_confidence = min_confidence
@@ -38,7 +41,7 @@ class Detector:
         # will be typeof None|list<(startX, startY, endX, endY, confidence)>
         self.detected_faces = None
         self.detected_faces_identity = None
-        self.net = cv2.dnn.readNetFromCaffe(proto, model)
+        self.net = cv2.dnn.readNetFromTensorflow(proto, model)
         if detect_identity:
             self.identifier = Identifier()
 
@@ -96,8 +99,9 @@ class Detector:
 
     def find_identities(self, frame):
         if self.detected_faces is not None:
+            self.detected_faces_identity = []
             for face in self.detected_faces:
-                self.identifier.predict(Detector.extract_image(frame, face))
+                self.detected_faces_identity.append(self.identifier.predict(Detector.extract_image(frame, face)))
 
     @staticmethod
     @throttle.wrap(5, 1)
@@ -133,8 +137,56 @@ class Identifier:
         if treatment == Identifier.Treatment.TRAIN:
             with tempfile.TemporaryDirectory() as tempdir:
                 self.train(tempdir)
+            # self.train('./temp')
         else:
             self.load()
+
+    @staticmethod
+    def seattle_model(input_width=32, input_height=32, feature_maps=32, feature_window_size=(5, 5), dropout1=0.2,
+                      dense=128, dropout2=0.5, use_max_pooling=True, pool_size=(2, 2), optimizer='rmsprop'):
+        model = Sequential()
+
+        # - 20 feature maps (each feature map is a reduced-size convolution that detects a different feature)
+        # - 3 pixel square window
+        model.add(Conv2D(feature_maps,
+                         feature_window_size,
+                         input_shape=(input_width, input_height, 6),
+                         padding='same',
+                         data_format='channels_last',
+                         activation='relu'))
+
+        # - 40 feature maps (add more features)
+        # - 3 pixel square window
+        model.add(Conv2D(feature_maps,
+                         feature_window_size,
+                         padding='same',
+                         data_format='channels_last',
+                         activation='relu'))
+
+        # Pooling layer
+        if use_max_pooling:
+            model.add(MaxPooling2D(pool_size=pool_size,
+                                   data_format='channels_last'))
+        else:
+            model.add(AveragePooling2D(pool_size=pool_size,
+                                       data_format='channels_last'))
+
+        model.add(Dropout(0.2))
+
+        model.add(Flatten())
+        model.add(Dense(128,
+                        activation='relu',
+                        kernel_constraint=maxnorm(3)))
+
+        # Dropout set to 50%.
+        model.add(Dropout(0.5))
+        model.add(Dense(1, activation='sigmoid'))
+
+        model.compile(loss='categorical_crossentropy',
+                      metrics=['binary_accuracy'],
+                      optimizer='rmsprop')
+
+        return model
 
     @staticmethod
     def create_model(length=25):
@@ -198,7 +250,7 @@ class Identifier:
                                                            batch_size=4,
                                                            class_mode='categorical',
                                                            subset="validation")
-        model = Identifier.create_model(24)
+        model = Identifier.create_model(len(dataset))
         model.fit(train_generator,
                   steps_per_epoch=30,
                   epochs=20,
