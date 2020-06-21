@@ -49,7 +49,8 @@ class App:
         for filename in os.listdir(capture_dir):
             if filename.endswith('.jpeg'):
                 image = cv2.imread(capture_dir + '/' + filename)
-                print(self.detector.identifier.predict(image))
+                print(colored(filename, 'red', attrs=['bold']) + ' identified as : ' +
+                      self.detector.identifier.predict(image))
 
 
 if __name__ == "__main__":

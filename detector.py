@@ -289,5 +289,6 @@ class Identifier:
     def predict(self, img):
         image = np.expand_dims(cv2.cvtColor(cv2.resize(img, (150, 150)), cv2.COLOR_RGB2BGR), axis=0)
         classes = self.model.predict(image, batch_size=4)
-
-        return self.faces_list[np.argmax(classes)]
+        index_founded = np.argmax(classes)
+        confidence = "%.2f" % (classes[0][index_founded] * 100)
+        return self.faces_list[index_founded] + f'(confidence : {str(confidence)})'
